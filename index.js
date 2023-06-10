@@ -29,16 +29,25 @@ async function run() {
     const instructorsCollection = client
       .db("fashionDb")
       .collection("instructors");
-    // all classes data---------------
+
+    // All classes data---------------
     app.get("/classes", async (req, res) => {
-      const result = await classesCollection.find().toArray();
+      const result = await classesCollection
+        .find()
+        .sort({ total_students: -1 })
+        .toArray();
       res.send(result);
     });
+
     // all instructors data -----------
     app.get("/instructors", async (req, res) => {
-      const result = await instructorsCollection.find().toArray();
+      const result = await instructorsCollection
+        .find()
+        .sort({ totalStudent: -1 })
+        .toArray();
       res.send(result);
     });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
