@@ -32,6 +32,20 @@ async function run() {
       .db("fashionDb")
       .collection("instructors");
 
+    // user API---------
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      console.log(existingUser);
+      if (existingUser) {
+        return res.send({ message: "user Already Exist" });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
     // All classes data---------------
     app.get("/classes", async (req, res) => {
       const result = await classesCollection
@@ -74,13 +88,6 @@ async function run() {
       const item = req.body;
       console.log(item);
       const result = await cartCollection.insertOne(item);
-      res.send(result);
-    });
-
-    // user API---------
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const result = await userCollection.insertOne(user);
       res.send(result);
     });
 
