@@ -25,6 +25,7 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
+    const userCollection = client.db("fashionDb").collection("users");
     const classesCollection = client.db("fashionDb").collection("classes");
     const cartCollection = client.db("fashionDb").collection("carts");
     const instructorsCollection = client
@@ -73,6 +74,13 @@ async function run() {
       const item = req.body;
       console.log(item);
       const result = await cartCollection.insertOne(item);
+      res.send(result);
+    });
+
+    // user API---------
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user);
       res.send(result);
     });
 
