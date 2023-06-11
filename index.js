@@ -26,6 +26,7 @@ async function run() {
     // await client.connect();
 
     const classesCollection = client.db("fashionDb").collection("classes");
+    const cartCollection = client.db("fashionDb").collection("carts");
     const instructorsCollection = client
       .db("fashionDb")
       .collection("instructors");
@@ -45,6 +46,14 @@ async function run() {
         .find()
         .sort({ totalStudent: -1 })
         .toArray();
+      res.send(result);
+    });
+
+    // cart Collection--------
+    app.post("/carts", async (req, res) => {
+      const item = req.body;
+      console.log(item);
+      const result = await cartCollection.insertOne(item);
       res.send(result);
     });
 
