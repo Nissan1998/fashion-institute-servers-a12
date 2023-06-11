@@ -49,7 +49,18 @@ async function run() {
       res.send(result);
     });
 
-    // cart Collection--------
+    // cart get Collection--------
+    app.get("/carts", async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        return res.send([]);
+      }
+      const query = { email: email };
+      const result = await cartCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // cart post Collection--------
     app.post("/carts", async (req, res) => {
       const item = req.body;
       console.log(item);
