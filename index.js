@@ -32,6 +32,12 @@ async function run() {
       .db("fashionDb")
       .collection("instructors");
 
+    // all user api
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
     // user API---------
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -44,6 +50,19 @@ async function run() {
       }
       const result = await userCollection.insertOne(user);
       res.send(result);
+    });
+
+    // update Role APi
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedAdmin = {
+        $set: {
+          role: "Admin",
+        },
+      };
+      const result = await userCollection.updateOne(query, updatedAdmin);
+      res.send(result)
     });
 
     // All classes data---------------
