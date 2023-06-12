@@ -9,6 +9,26 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// jwt middle-ware
+const verifyJwt = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "unauthorized Access" });
+  }
+  const token = authorization.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+    if (err) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized Access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.vtwk5ft.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -32,14 +52,27 @@ async function run() {
     const instructorsCollection = client
       .db("fashionDb")
       .collection("instructors");
-    // jwt
+    // jwt token
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
-        expiresIn: "1h",
+        expiresIn: "7d",
       });
       res.send(token);
     });
+
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      if (user?.role !== "Admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message" });
+      }
+      next();
+    };
 
     // all user api
     app.get("/users", async (req, res) => {
@@ -58,6 +91,29 @@ async function run() {
         return res.send({ message: "user Already Exist" });
       }
       const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // verifying admin api
+    app.get("/users/admin/:email", verifyJwt, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ admin: false });
+      }
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const result = { admin: user?.role === "Admin" };
+      res.send(result);
+    });
+    // verifying instructor api
+    app.get("/users/instructor/:email", verifyJwt, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ instructor: false });
+      }
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const result = { instructor: user?.role === "Instructor" };
       res.send(result);
     });
 
@@ -96,6 +152,13 @@ async function run() {
       res.send(result);
     });
 
+    // classes post api
+    app.post("/classes", async (req, res) => {
+      const course = req.body;
+      const result = await classesCollection.insertOne(course);
+      res.send(result);
+    });
+
     // class Delete Api--------
     app.delete("/carts/:id", async (req, res) => {
       const id = req.params.id;
@@ -114,11 +177,18 @@ async function run() {
     });
 
     // cart get Collection--------
-    app.get("/carts", async (req, res) => {
+    app.get("/carts", verifyJwt, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         return res.send([]);
       }
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res
+          .status(401)
+          .send({ error: true, message: "Forbidden Authorization" });
+      }
+
       const query = { email: email };
       const result = await cartCollection.find(query).toArray();
       res.send(result);
