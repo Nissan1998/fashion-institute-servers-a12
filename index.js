@@ -2,6 +2,7 @@ const express = require("express");
 require("dotenv").config();
 const app = express();
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 
 // middle-ware
@@ -31,6 +32,14 @@ async function run() {
     const instructorsCollection = client
       .db("fashionDb")
       .collection("instructors");
+    // jwt
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, env.process.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res.send(token);
+    });
 
     // all user api
     app.get("/users", async (req, res) => {
