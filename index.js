@@ -151,6 +151,12 @@ async function run() {
         .toArray();
       res.send(result);
     });
+    app.get("/classes/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { instructor_email: email };
+      const result = await classesCollection.find(query).toArray();
+      res.send(result);
+    });
 
     // classes post api
     app.post("/classes", async (req, res) => {
