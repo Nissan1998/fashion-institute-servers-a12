@@ -62,7 +62,20 @@ async function run() {
         },
       };
       const result = await userCollection.updateOne(query, updatedAdmin);
-      res.send(result)
+      res.send(result);
+    });
+
+    // Make Instructor Api
+    app.patch("/users/instructor/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedAdmin = {
+        $set: {
+          role: "Instructor",
+        },
+      };
+      const result = await userCollection.updateOne(query, updatedAdmin);
+      res.send(result);
     });
 
     // All classes data---------------
