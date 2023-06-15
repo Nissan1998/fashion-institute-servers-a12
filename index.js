@@ -1,13 +1,44 @@
 const express = require("express");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET);
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const port = process.env.PORT || 5000;
 
 // middle-ware
 app.use(cors());
 app.use(express.json());
+
+let transporter = nodemailer.createTransport({
+  host: "smtp.sendgrid.net",
+  port: 587,
+  auth: {
+    use: "apikey",
+    pass: process.env.SENDGRID_API_KEY,
+  },
+});
+
+// send payment confirmation email
+const sendPaymentConfirmation = (payment) => {
+  transporter.sendMail(
+    {
+      from: "SENDER_EMAIL", // verified sender email
+      to: "nissanm925@gmail.com", // recipient email
+      subject: "You paid Successfully", // Subject line
+      text: "Hello world!", // plain text body
+      html: "<b>Payment confirm</b>", // html body
+    },
+    function (error, info) {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log("Email sent: " + info.response);
+      }
+    }
+  );
+};
 
 // jwt middle-ware
 const verifyJwt = (req, res, next) => {
@@ -49,6 +80,7 @@ async function run() {
     const userCollection = client.db("fashionDb").collection("users");
     const classesCollection = client.db("fashionDb").collection("classes");
     const cartCollection = client.db("fashionDb").collection("carts");
+    const paymentCollection = client.db("fashionDb").collection("payments");
     const instructorsCollection = client
       .db("fashionDb")
       .collection("instructors");
@@ -134,12 +166,12 @@ async function run() {
     app.patch("/users/instructor/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      const updatedAdmin = {
+      const updatedInstructor = {
         $set: {
           role: "Instructor",
         },
       };
-      const result = await userCollection.updateOne(query, updatedAdmin);
+      const result = await userCollection.updateOne(query, updatedInstructor);
       res.send(result);
     });
 
@@ -206,6 +238,69 @@ async function run() {
       console.log(item);
       const result = await cartCollection.insertOne(item);
       res.send(result);
+    });
+
+    // create payment intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    // payment stored API
+    app.post("/payments", async (req, res) => {
+      const paymentInfo = req.body;
+      const insertedResult = await paymentCollection.insertOne(paymentInfo);
+      const query = {
+        _id: {
+          $in: paymentInfo.selectedCourse.map((id) => new ObjectId(id)),
+        },
+      };
+      const deletedConfirm = await cartCollection.deleteMany(query);
+      const updateCourseQuery = {
+        _id: {
+          $in: paymentInfo.coursesId.map((id) => new ObjectId(id)),
+        },
+      };
+      const updateCourseOptions = {
+        $inc: { total_students: 1, available_seats: -1 },
+      };
+      const updateCourseResult = await classesCollection.updateMany(
+        updateCourseQuery,
+        updateCourseOptions
+      );
+
+      // send an email
+
+      console.log(updateCourseResult);
+      res.send({ insertedResult, deletedConfirm, updateCourseResult });
+    });
+
+    // Paid Course Api
+    app.get("/paidCourse", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const payments = await paymentCollection.find(query).toArray();
+
+      // Extract course_ids from payments
+      const courseIds = payments
+        .map((payment) => payment.coursesName)
+        .flat()
+        .map((name) => name);
+
+      // // Find courses matching the course_ids
+      const courses = await classesCollection
+        .find({ name: { $in: courseIds } })
+        .toArray();
+      res.send(courses);
     });
 
     console.log(
