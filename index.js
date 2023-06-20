@@ -5,30 +5,47 @@ const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const mg = require("nodemailer-mailgun-transport");
 const port = process.env.PORT || 5000;
 
 // middle-ware
 app.use(cors());
 app.use(express.json());
 
-let transporter = nodemailer.createTransport({
-  host: "smtp.sendgrid.net",
-  port: 587,
+// mailgun
+// let transporter = nodemailer.createTransport({
+//   host: "smtp.sendgrid.net",
+//   port: 587,
+//   auth: {
+//     use: "apikey",
+//     pass: process.env.SENDGRID_API_KEY,
+//   },
+// });
+
+const auth = {
   auth: {
-    use: "apikey",
-    pass: process.env.SENDGRID_API_KEY,
+    api_key: process.env.MAILGUN_PRIVATE_KEY,
+    domain: process.env.EMAIL_DOMAIN,
   },
-});
+};
+
+const transporter = nodemailer.createTransport(mg(auth));
 
 // send payment confirmation email
 const sendPaymentConfirmation = (payment) => {
   transporter.sendMail(
     {
-      from: "SENDER_EMAIL", // verified sender email
-      to: "nissanm925@gmail.com", // recipient email
-      subject: "You paid Successfully", // Subject line
+      from: "jnnissanm@gmail.com", // verified sender email
+      to: "jnnissanm@gmail.com", // recipient email
+      subject: "Your Order is Confirmed", // Subject line
       text: "Hello world!", // plain text body
-      html: "<b>Payment confirm</b>", // html body
+      html: `
+      <div>
+      <h2>Payment Confirmed!</h2>
+      <p>TransactionID: ${payment.transactionId}</p>
+      </div>
+      
+      `, // html body
     },
     function (error, info) {
       if (error) {
@@ -265,6 +282,10 @@ async function run() {
         },
       };
       const deletedConfirm = await cartCollection.deleteMany(query);
+
+      // send email about confirmation message
+      sendPaymentConfirmation(paymentInfo);
+
       const updateCourseQuery = {
         _id: {
           $in: paymentInfo.coursesId.map((id) => new ObjectId(id)),
@@ -292,15 +313,32 @@ async function run() {
 
       // Extract course_ids from payments
       const courseIds = payments
-        .map((payment) => payment.coursesName)
+        .map((payment) => payment.coursesId)
         .flat()
-        .map((name) => name);
+        .map((id) => new ObjectId(id));
 
       // // Find courses matching the course_ids
       const courses = await classesCollection
-        .find({ name: { $in: courseIds } })
+        .find({ _id: { $in: courseIds } })
         .toArray();
       res.send(courses);
+    });
+
+    // payment History of student
+    app.get("/payment-history/:email", verifyJwt, async (req, res) => {
+      const email = req.params.email;
+      if (!email) {
+        return res.send([]);
+      }
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res
+          .status(401)
+          .send({ error: true, message: "Forbidden Authorization" });
+      }
+      const query = { email: email };
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
     });
 
     console.log(
